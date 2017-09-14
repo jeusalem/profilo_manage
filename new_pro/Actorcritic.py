@@ -12,6 +12,7 @@ import os
 import math
 import time
 
+CP_POS_IN_A_STATE = (NC.NUM_DAYS-1)*NC.NUM_FEATURES+(NC.close_feature_index+1)
 
 
 deafualt_weights_path = NC.DEAFUALT_WEIGHTS_PATH #存放权重的默认文件夹路径
@@ -101,6 +102,9 @@ class Actorcritic(object):
 
 
         except StopIteration:
+            # for state in full_states:
+            #     print('state',state)
+            # print('ratio_day',ratio_day)
 
             return full_states
 
@@ -110,18 +114,22 @@ class Actorcritic(object):
         loss = 0
         p_c = 1
         buff = ReplayBuffer(NC.BUFFER_SIZE)
+        wb = load_workbook(self.read_file)
+        self.write_title(wb)
 
         b_imp_without_cash = np.zeros(NC.NUM_STOCKS)
         b_imp = np.append(1,b_imp_without_cash)
-        print('b_imp____without_cash',b_imp_without_cash)
+        #print('b_imp____without_cash',b_imp_without_cash)
 
+        print('full_states',len(full_states))
         for i in range(len(full_states)-1):
             s_t = np.array(full_states[i])
             s_t1 = np.array(full_states[i+1])
             x_t1 = s_t1[-1][NC.close_feature_index]
             x_t1 = np.append(1,x_t1)
-            print('x_t1',x_t1)
-            print('s_t1',s_t1)
+            #print('x_t1',x_t1)
+            #print('s_t',s_t)
+            #print('s_t1',s_t1)
             s_t1 = s_t1.transpose((1,2,0))
             s_t = s_t.transpose((1,2,0))
             a_t = actor.model.predict(s_t.reshape(1,NC.NUM_FEATURES,NC.NUM_STOCKS,NC.NUM_DAYS),NC.BATCH_SIZE).flatten()
@@ -131,7 +139,7 @@ class Actorcritic(object):
             # x_t1 = np.append(1,x_t1) #加上现金，比例总是1
             equation = Equation(b_imp_without_cash,a_t[1:],NC.c_s,NC.c_p)
             u_t = equation.get_u_t()
-            print('u_t',u_t)
+            #print('u_t',u_t)
 
             #################################
             #reward
@@ -143,11 +151,12 @@ class Actorcritic(object):
             p_a = p_c*u_t
             t_c = p_c - p_a
             #print('t_c',t_c)
-            print('p_a',p_a)
+            #print('p_a',p_a)
             b_imp_next = a_t * x_t1 / np.inner(a_t, x_t1)
             p_c_next = p_a * np.inner(a_t, x_t1)
             #####################################
             #TODO write_to_excel
+            self.write_result(wb,b_imp,a_t,p_c,p_a,u_t,r_t,t_c,i)
             #####################################
             p_c = p_c_next
             b_imp = b_imp_next
@@ -184,9 +193,10 @@ class Actorcritic(object):
                 actor.target_train()
                 critic.target_train()
 
-    #
-    #
-    #
+        wb.save(self.read_file)
+
+
+
     def stock_manage(self):
         state_iter = self.get_states()
         sess = tf.Session()
@@ -333,8 +343,45 @@ class Actorcritic(object):
     #     critic.model.save_weights(critic_weights)
     #     critic.target_model.save_weights(target_critic_weights)
     #
+    def write_result(self,wb,b_imp,b_i,pc,pa,u,reward,tc,state_index):
 
+        ws = wb.get_active_sheet()
+        s = ''
+        for j in range(len(b_imp)):
+            s += str(b_imp[j])+','
 
+        B_IMP_ROW_POS = (state_index+1)*NC.NUM_FEATURES \
+                        + NC.TITLE_START_ROW+CP_POS_IN_A_STATE #state_index+1 是因为第一个状态的第一天是表里的第二天
+
+        #print(B_IMP_ROW_POS,state_index)
+        B_IMP_COL_POS = NC.NUM_STOCKS +NC.STOCK_START_POS +1 # 1 for column p
+
+        ws.cell(row=B_IMP_ROW_POS, column=B_IMP_COL_POS, value=s)
+        ################
+        for i in range(len(b_i)):
+            ws.cell(row=B_IMP_ROW_POS,column=B_IMP_COL_POS+1+i,value=b_i[i])
+        ################
+        PA_POS = B_IMP_COL_POS+(NC.NUM_STOCKS+1)+1 # (CD.NUM_STOCKS+1) includes cash
+        ws.cell(row=B_IMP_ROW_POS, column=PA_POS,value=pa)
+        ws.cell(row=B_IMP_ROW_POS, column=B_IMP_COL_POS-1, value=pc)
+        ws.cell(row=B_IMP_ROW_POS, column=PA_POS + 1, value=tc)
+        ws.cell(row=B_IMP_ROW_POS, column=PA_POS + 2, value=u)
+        ws.cell(row=B_IMP_ROW_POS, column=PA_POS + 3, value=reward)
+
+    def write_title(self,wb):
+        ws = wb.get_active_sheet()
+        COLUMN_P_C =  NC.NUM_STOCKS+NC.START_COLUMN_DATE+2
+        ws.cell(row=NC.TITLE_START_ROW,column=COLUMN_P_C,value='p_c')
+        ws.cell(row=NC.TITLE_START_ROW, column=COLUMN_P_C+1, value='b_imp')
+        for i in range(NC.NUM_STOCKS+1):
+            ws.cell(row=NC.TITLE_START_ROW, column=COLUMN_P_C+2+i, value='b_'+str(i))
+        COLUMN_P_A = COLUMN_P_C + NC.NUM_STOCKS + 3
+        ws.cell(row=NC.TITLE_START_ROW, column=COLUMN_P_A, value='pa')
+        ws.cell(row=NC.TITLE_START_ROW, column=COLUMN_P_A + 1, value='tc')
+        ws.cell(row=NC.TITLE_START_ROW, column=COLUMN_P_A + 2, value='u')
+        ws.cell(row=NC.TITLE_START_ROW, column=COLUMN_P_A + 3, value='reward')
+
+        wb.save(self.read_file)
 
 
 

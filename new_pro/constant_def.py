@@ -17,3 +17,4 @@ pa = 1 #初始迭代值
 c_s = 0.003 #卖的费率
 c_p = 0.002 #买的费率
 LEARNING_RATE = 0.001
+STOCK_START_POS = 3 #股票开始的列
