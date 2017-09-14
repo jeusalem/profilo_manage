@@ -1,0 +1,19 @@
+#excel中序号是从1开始的
+TITLE_START_ROW = 3 #excel文件中从第3行开始写入数据，前面空两行
+NUM_FEATURES = 6 #特征数
+NUM_STOCKS = 10 #股票数量
+NUM_DAYS = 4 #帧数，4天当作一个状态
+START_COLUMN_DATE = 1   #excel表中date开始的列号
+FILE_FORMAT = 'txt'
+FEATURES = ['open','high','low','close','volumn','amount'] #特征值列表
+close_feature_index = 3 # start from 0
+BUFFER_SIZE = 500
+BATCH_SIZE = 250
+TAU = 0.2  #网络更新率
+GAMMA = 0.99 #折扣率
+DEAFUALT_WEIGHTS_PATH = r'F:\OneDrive\project1\weights'
+erro = 1e-7 #迭代差值阈值
+pa = 1 #初始迭代值
+c_s = 0.003 #卖的费率
+c_p = 0.002 #买的费率
+LEARNING_RATE = 0.001
